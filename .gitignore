@@ -1,0 +1,39 @@
+# Ye pura command copy-paste karo:
+
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# PyInstaller
+build/
+dist/
+*.spec
+*.dmg
+*.pkg
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Settings
+settings.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+EOF
+
+echo "✅ .gitignore created"

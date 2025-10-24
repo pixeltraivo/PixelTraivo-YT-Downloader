@@ -1,0 +1,76 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        brew install ffmpeg
+        pip install yt-dlp pyinstaller
+    
+    - name: 🔨 Build App
+      run: |
+        pyinstaller \
+          --name="PixelTraivo YT Downloader" \
+          --windowed \
+          --onedir \
+          --noconfirm \
+          --clean \
+          --add-binary="$(which ffmpeg):." \
+          --add-binary="$(which ffprobe):." \
+          --hidden-import=yt_dlp \
+          --target-arch=universal2 \
+          --osx-bundle-identifier=com.pixeltraivo.ytdownloader \
+          main.py
+    
+    - name: 📀 Create DMG
+      run: |
+        hdiutil create -volname "PixelTraivo YT Downloader" \
+                       -srcfolder "dist/PixelTraivo YT Downloader.app" \
+                       -ov -format UDZO \
+                       "PixelTraivo-YT-Downloader-macOS.dmg"
+    
+    - name: ⬆️ Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PixelTraivo-YT-Downloader-macOS
+        path: PixelTraivo-YT-Downloader-macOS.dmg
+    
+    - name: 🎉 Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: PixelTraivo-YT-Downloader-macOS.dmg
+        generate_release_notes: true
+        body: |
+          ## 📥 Installation
+          
+          1. Download `PixelTraivo-YT-Downloader-macOS.dmg`
+          2. Open DMG file
+          3. Drag app to Applications
+          4. Right-click → Open (first time)
+          
+          ## ✨ Features
+          
+          - High-quality video downloads (up to 1080p)
+          - MP3 audio extraction
+          - Real-time progress tracking
+          - Universal binary (M1/M2 + Intel)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
