@@ -1,0 +1,89 @@
+name: Build Multi-Platform
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build Windows EXE
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "PixelTraivo-YT-Downloader" --add-data "assets;assets" main.py
+      
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v3
+        with:
+          name: Windows-Executable
+          path: dist/PixelTraivo-YT-Downloader.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build macOS App
+        run: |
+          chmod +x build.sh
+          ./build.sh
+      
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOS-DMG
+          path: PixelTraivo-YT-Downloader.dmg
+
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: Windows-Executable
+          path: ./artifacts/windows
+      
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: macOS-DMG
+          path: ./artifacts/macos
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/windows/PixelTraivo-YT-Downloader.exe
+            ./artifacts/macos/PixelTraivo-YT-Downloader.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
