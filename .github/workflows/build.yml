@@ -1,118 +1,42 @@
-name: Build Multi-Platform
-
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-      
-      - name: Build Windows EXE
-        run: |
-          pyinstaller --noconfirm --onefile --windowed --name "PixelTraivo-YT-Downloader" --add-data "assets;assets" main.py
-      
-      - name: Rename Windows executable
-        run: |
-          move dist\PixelTraivo-YT-Downloader.exe dist\PixelTraivo-YT-Downloader-Windows.exe
-      
-      - name: Upload Windows EXE
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-Executable
-          path: dist/PixelTraivo-YT-Downloader-Windows.exe
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-      
-      - name: Build macOS App
-        run: |
-          chmod +x build.sh
-          ./build.sh
-      
-      - name: Upload macOS DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-DMG
-          path: PixelTraivo-YT-Downloader.dmg
-
-  create-release:
-    needs: [build-windows, build-macos]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Windows-Executable
-          path: ./artifacts
-      
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: macOS-DMG
-          path: ./artifacts
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ./artifacts/PixelTraivo-YT-Downloader-Windows.exe
-            ./artifacts/PixelTraivo-YT-Downloader.dmg
-          body: |
-            # 🎉 PixelTraivo YouTube Downloader
-            
-            ## 📥 Installation
-            
-            ### Windows
-            1. Download `PixelTraivo-YT-Downloader-Windows.exe`
-            2. Double-click to run
-            3. (If SmartScreen warning, click "More info" → "Run anyway")
-            
-            ### macOS
-            1. Download `PixelTraivo-YT-Downloader.dmg`
-            2. Open DMG file
-            3. Drag app to Applications
-            4. Right-click → Open (first time)
-            
-            ## ✨ Features
-            - High-quality video downloads (up to 1080p)
-            - MP3 audio extraction
-            - Real-time progress tracking
-            - Beautiful modern UI
-            - Universal binary for macOS (M1/M2 + Intel)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+build-macos:
+  runs-on: macos-latest
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build macOS App
+      run: |
+        pyinstaller \
+          --name="PixelTraivo-YT-Downloader" \
+          --windowed \
+          --onedir \
+          --noconfirm \
+          --clean \
+          --add-data="assets:assets" \
+          --hidden-import=yt_dlp \
+          --target-arch=universal2 \
+          main.py
+    
+    - name: Create DMG
+      run: |
+        hdiutil create -volname "PixelTraivo YT Downloader" \
+                       -srcfolder "dist/PixelTraivo-YT-Downloader.app" \
+                       -ov -format UDZO \
+                       PixelTraivo-YT-Downloader.dmg
+    
+    - name: Upload macOS DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: macOS-DMG
+        path: PixelTraivo-YT-Downloader.dmg
