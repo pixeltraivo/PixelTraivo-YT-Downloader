@@ -6,6 +6,10 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# YEH SECTION ADD KIYA HAI - PERMISSIONS
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest
