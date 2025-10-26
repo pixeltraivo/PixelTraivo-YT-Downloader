@@ -15,6 +15,20 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+# ========== SSL CERTIFICATE FIX ==========
+import ssl
+import certifi
+
+# Set SSL certificate paths globally
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+
+# For PyInstaller bundles
+if getattr(sys, 'frozen', False):
+    cert_path = certifi.where()
+    os.environ['SSL_CERT_FILE'] = cert_path
+    os.environ['REQUESTS_CA_BUNDLE'] = cert_path
+
 # ========== FFMPEG PATH DETECTION ==========
 def get_ffmpeg_path():
     """
@@ -48,6 +62,8 @@ def get_ffmpeg_path():
     
     # Not found
     return None
+
+
 
 # Console Logger Class
 class ConsoleLogger:
