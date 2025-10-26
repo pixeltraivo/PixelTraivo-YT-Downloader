@@ -8,10 +8,46 @@ from tkinter import ttk, messagebox, filedialog, scrolledtext
 import yt_dlp
 import threading
 import os
+import sys
 import json
 import subprocess
+import shutil
 from pathlib import Path
 from datetime import datetime
+
+# ========== FFMPEG PATH DETECTION ==========
+def get_ffmpeg_path():
+    """
+    Get ffmpeg path for bundled or system installation
+    Supports PyInstaller bundles and system installations
+    """
+    # Check if running as PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        
+        # Check for bundled ffmpeg
+        if sys.platform == 'darwin':  # macOS
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg')
+            ffprobe_path = os.path.join(base_path, 'ffprobe')
+        elif sys.platform == 'win32':  # Windows
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')
+            ffprobe_path = os.path.join(base_path, 'ffprobe.exe')
+        else:  # Linux
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg')
+            ffprobe_path = os.path.join(base_path, 'ffprobe')
+        
+        # Return directory if files exist
+        if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
+            return base_path
+    
+    # Check system PATH
+    system_ffmpeg = shutil.which('ffmpeg')
+    if system_ffmpeg:
+        return os.path.dirname(system_ffmpeg)
+    
+    # Not found
+    return None
 
 # Console Logger Class
 class ConsoleLogger:
@@ -66,6 +102,9 @@ class App:
         # Download history
         self.download_history = []
         
+        # Check ffmpeg availability
+        self.ffmpeg_path = get_ffmpeg_path()
+        
         # Load saved settings
         self.load_settings()
         
@@ -75,8 +114,19 @@ class App:
         # Keyboard shortcuts
         self.setup_shortcuts()
         
+        # Show ffmpeg status
+        self.check_ffmpeg_status()
+        
         # Save settings on close
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+    
+    def check_ffmpeg_status(self):
+        """Check and log ffmpeg availability"""
+        if self.ffmpeg_path:
+            self.log(f"✅ ffmpeg found at: {self.ffmpeg_path}")
+        else:
+            self.log("⚠️  ffmpeg not found - MP3 conversion may not work")
+            self.log("   Install: brew install ffmpeg (macOS)")
     
     def center_window(self):
         """Center window on screen"""
@@ -400,7 +450,12 @@ class App:
     def open_download_folder(self):
         """Open download folder in Finder"""
         try:
-            subprocess.run(['open', self.download_path])
+            if sys.platform == 'darwin':  # macOS
+                subprocess.run(['open', self.download_path])
+            elif sys.platform == 'win32':  # Windows
+                subprocess.run(['explorer', self.download_path])
+            else:  # Linux
+                subprocess.run(['xdg-open', self.download_path])
             self.log(f"📂 Opened folder: {self.download_path}")
         except Exception as e:
             self.log(f"❌ Error opening folder: {e}")
@@ -460,8 +515,15 @@ class App:
                 'progress_with_newline': False,
             }
             
+            # Add ffmpeg location if available
+            if self.ffmpeg_path:
+                ydl_opts['ffmpeg_location'] = self.ffmpeg_path
+            
             # Audio conversion
             if format_type == "MP3" or quality == "Audio Only":
+                if not self.ffmpeg_path:
+                    self.log("⚠️  Warning: ffmpeg not found, MP3 conversion may fail")
+                
                 ydl_opts['postprocessors'] = [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',

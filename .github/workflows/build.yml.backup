@@ -1,0 +1,42 @@
+build-macos:
+  runs-on: macos-latest
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build macOS App
+      run: |
+        pyinstaller \
+          --name="PixelTraivo-YT-Downloader" \
+          --windowed \
+          --onedir \
+          --noconfirm \
+          --clean \
+          --add-data="assets:assets" \
+          --hidden-import=yt_dlp \
+          --target-arch=universal2 \
+          main.py
+    
+    - name: Create DMG
+      run: |
+        hdiutil create -volname "PixelTraivo YT Downloader" \
+                       -srcfolder "dist/PixelTraivo-YT-Downloader.app" \
+                       -ov -format UDZO \
+                       PixelTraivo-YT-Downloader.dmg
+    
+    - name: Upload macOS DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: macOS-DMG
+        path: PixelTraivo-YT-Downloader.dmg

@@ -1,59 +1,121 @@
 #!/bin/bash
-# simple-build.sh
+# PixelTraivo YT Downloader - macOS Build Script
 
-set -e
+set -e  # Exit on error
 
-echo "🚀 Simple Build Starting..."
+echo "🚀 PixelTraivo YouTube Downloader - Build Starting..."
+echo ""
 
-# Cleanup
+# ========== CLEANUP ==========
+echo "🧹 Cleaning up old builds..."
 rm -rf build dist *.dmg
+echo "✅ Cleanup done"
+echo ""
 
-# Setup
-python3 -m venv venv
+# ========== SETUP ENVIRONMENT ==========
+echo "📦 Setting up Python environment..."
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
+
 source venv/bin/activate
-pip install -q yt-dlp pyinstaller
+pip install -q --upgrade pip
+pip install -q -r requirements.txt
+pip install -q pyinstaller
+echo "✅ Environment ready"
+echo ""
 
-# Build
-echo "🔨 Building app..."
+# ========== CHECK FFMPEG ==========
+echo "🔍 Checking for ffmpeg..."
+FFMPEG_PATH=$(which ffmpeg || echo "")
+FFPROBE_PATH=$(which ffprobe || echo "")
 
-pyinstaller --name="PixelTraivo YT Downloader" \
+if [ -z "$FFMPEG_PATH" ] || [ -z "$FFPROBE_PATH" ]; then
+    echo "❌ ERROR: ffmpeg/ffprobe not found!"
+    echo ""
+    echo "Install with: brew install ffmpeg"
+    exit 1
+fi
+
+echo "✅ ffmpeg found at: $FFMPEG_PATH"
+echo "✅ ffprobe found at: $FFPROBE_PATH"
+echo ""
+
+# ========== CHECK ICON ==========
+if [ ! -f "assets/icon.icns" ]; then
+    echo "⚠️  Warning: icon.icns not found, building without icon"
+    ICON_ARG=""
+else
+    echo "✅ Icon found: assets/icon.icns"
+    ICON_ARG="--icon=assets/icon.icns"
+fi
+echo ""
+
+# ========== BUILD APP ==========
+echo "🔨 Building macOS application..."
+pyinstaller \
+    --name="PixelTraivo YT Downloader" \
     --windowed \
-    --onefile \
+    --onedir \
     --noconfirm \
-    --add-binary="$(which ffmpeg):." \
-    --add-binary="$(which ffprobe):." \
+    --clean \
+    $ICON_ARG \
+    --add-binary="$FFMPEG_PATH:." \
+    --add-binary="$FFPROBE_PATH:." \
+    --add-data="assets:assets" \
+    --hidden-import=yt_dlp \
+    --hidden-import=tkinter \
+    --osx-bundle-identifier=com.pixeltraivo.ytdownloader \
     main.py
 
-# For .app bundle (macOS specific)
-if [ ! -d "dist/PixelTraivo YT Downloader.app" ]; then
-    echo "Creating .app bundle..."
-    
-    # Rebuild as --onedir for proper .app
-    pyinstaller --name="PixelTraivo YT Downloader" \
-        --windowed \
-        --onedir \
-        --noconfirm \
-        --add-binary="$(which ffmpeg):." \
-        --add-binary="$(which ffprobe):." \
-        main.py
-fi
+echo "✅ Build complete!"
+echo ""
 
-# Create simple DMG
-echo "📀 Creating DMG..."
+# ========== VERIFY BUILD ==========
+APP_PATH="dist/PixelTraivo YT Downloader.app"
 
-APP="dist/PixelTraivo YT Downloader.app"
-DMG="PixelTraivo-YT-Downloader.dmg"
-
-if [ -d "$APP" ]; then
-    hdiutil create -volname "PixelTraivo YT Downloader" \
-                   -srcfolder "$APP" \
-                   -ov -format UDZO \
-                   "$DMG"
-    
-    echo "✅ Done! DMG: $DMG"
-    ls -lh "$DMG"
-else
-    echo "❌ App not found at: $APP"
+if [ ! -d "$APP_PATH" ]; then
+    echo "❌ ERROR: App bundle not created!"
+    echo "Expected: $APP_PATH"
+    echo ""
     echo "Contents of dist/:"
     ls -la dist/
+    exit 1
 fi
+
+echo "✅ App bundle created: $APP_PATH"
+echo ""
+
+# ========== CREATE DMG ==========
+echo "📀 Creating DMG installer..."
+DMG_NAME="PixelTraivo-YT-Downloader-macOS.dmg"
+
+# Run the DMG creation script
+if [ -f "create-dmg.sh" ]; then
+    chmod +x create-dmg.sh
+    ./create-dmg.sh
+else
+    # Fallback: Simple DMG creation
+    hdiutil create \
+        -volname "PixelTraivo YT Downloader" \
+        -srcfolder "$APP_PATH" \
+        -ov \
+        -format UDZO \
+        "$DMG_NAME"
+fi
+
+echo ""
+echo "=========================================="
+echo "✅ BUILD SUCCESSFUL!"
+echo "=========================================="
+echo ""
+echo "📦 Application: $APP_PATH"
+if [ -f "$DMG_NAME" ]; then
+    echo "📀 DMG Installer: $DMG_NAME"
+    echo ""
+    ls -lh "$DMG_NAME"
+fi
+echo ""
+echo "🧪 Test the app:"
+echo "   open \"$APP_PATH\""
+echo ""
